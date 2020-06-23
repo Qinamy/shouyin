@@ -21,7 +21,7 @@
             <van-row>
                 <van-col offset="2">
                     <div style="font-size:19px;margin-left: 8px;margin-bottom: 5px;">
-                        {{line.shangpin.title}}
+                        {{line.sp.title}}
                     </div>
                 </van-col>
             </van-row>
@@ -30,7 +30,7 @@
                     <van-cell-group>
                         <van-cell @click="changeFocus('input_price')" style="font-size: 50px;line-height: 60px;">
                             <div style="display: inline-block;color: red;">
-                                ￥{{line.shangpin.rmb_shangpin}}
+                                ￥{{line.sp.rmb_sp}}
                             </div>
 
                             <cursor_icon v-if="input_focus=='input_price'" style="display: inline-block;"></cursor_icon>
@@ -47,7 +47,7 @@
             <van-row>
                 <van-col offset="10">
                     <div style="color: lightgray; margin-top: 10px;font-size: 19px;" @click="setRefPrice">
-                        使用参考价 <label style="color:dodgerblue;">{{line.shangpin.rmb_ref}}</label> 元
+                        使用参考价 <label style="color:dodgerblue;">{{line.sp.rmb_ref}}</label> 元
                     </div>
                 </van-col>
             </van-row>
@@ -71,18 +71,18 @@
 
             <van-swipe-cell>
                 <van-card
-                        :num="line.qty_shangpin"
-                        :thumb="line.shangpin.thumb"
+                        :num="line.qty_sp"
+                        :thumb="line.sp.thumb"
                 >
                     <template #title>
                         <div style="float: left;margin-left: 5px;font-size: 19px;" @click="changeShow('name')">
-                            {{line.shangpin.title}}
+                            {{line.sp.title}}
                         </div>
                     </template>
 
                     <template #price>
                         <div style="color:red;font-size: 17px;float: right;" @click="changeShow('price')">
-                            ￥{{line.shangpin.rmb_price}}
+                            ￥{{line.rmb_snap}}
                         </div>
                     </template>
 
@@ -92,13 +92,13 @@
                     </template>
 
                     <template #num>
-                        <van-stepper min="1" v-model="line.qty_shangpin" theme="round" button-size="22" disable-input/>
+                        <van-stepper min="1" v-model="line.qty_sp" theme="round" button-size="22" disable-input/>
                     </template>
                 </van-card>
 
                 <template #right>
                     <van-button square text="删除" type="danger" class="delete-button"
-                                @click="deleteIndex(line.shangpin.goods_id)"/>
+                                @click="deleteIndex(line.sp.gid)"/>
                 </template>
             </van-swipe-cell>
         </van-dialog>
@@ -139,11 +139,12 @@
 
                 // 本地的购物车模型，和view绑定，深拷贝state的cart/line
                 line : {
-                    qty_shangpin : 1,
-                    shangpin : {
-                        goods_id : '',
+                    qty_sp : 1,
+                    rmb_snap : '',
+                    sp : {
+                        gid : '',
                         barcode : '',
-                        rmb_price : 0,
+                        rmb_price : '',
                         title : '',
                         rmb_ref : 0,
                         thumb : '',
@@ -158,9 +159,11 @@
                 'count',
                 'cashier_id',
                 'shop_id',
-                'shangpins',
-                'shangpins_indexed',
-                'shangpins_grouped',
+                'sps',
+                'sps_indexed',
+                'sps_grouped',
+                'cart_present',
+                'carts',
             ]),
         },
 
@@ -169,6 +172,20 @@
         created() {},
 
         mounted() {
+
+            this.api.goods_sync(this.$store.state.shop_id,this.$store.state.cashier_id).then(res=>{
+
+                console.log('res',res);
+                this.$store.commit('sps_init',res.data.result);
+                this.$store.commit('sps_indexed_init');
+                this.$store.commit('sps_grouped_init');
+
+                console.log('sps',this.$store.state.sps);
+                console.log('sps_indexed',this.$store.state.sps_indexed);
+                console.log('sps_grouped',this.$store.state.sps_grouped);
+
+            })
+
             // 在回调函数中使用，彼时访问不到this
             let that = this;
 
@@ -251,16 +268,18 @@
                 console.log(barcode);
                 if(this.scan_mode == 'barcode') {
                     //本地有该货号的商品
-                    if (this.shangpins_grouped[barcode] != undefined) {
+                    if (this.sps_grouped[barcode] != undefined) {
 
                         console.log('show index')
-                        if (this.shangpins_grouped[barcode].length == 1) {
+                        if (this.sps_grouped[barcode].length == 1) {
                             console.log('haha');
-                            
+
+                            var sp = this.sps_grouped[barcode][0];
                             // 将商品深拷贝，并显示到index中
                             this.line = {
-                                qty_shangpin : 1,
-                                shangpin : { ... this.shangpins_grouped[barcode][0] },
+                                qty_sp : 1,
+                                rmb_snap : sp.rmb_sp,
+                                sp : { ... sp[0] },
                             }
 
                             console.log('line',this.line);
@@ -276,38 +295,43 @@
                     else {
                         console.log('show price')
 
-                        this.api.goods_search_api(1).then(resp => {
+                        this.api.goods_search_api(barcode).then(resp => {
 
                             console.log('barcode api');
                             console.log('resp', resp)
 
                             //接口成功返回商品数据
-                            if (resp.data.qty > 0) {
+                            if (resp.data.qty == 1) {
                                 this.line = {
-                                    qty_shangpin : 1,
-                                    shangpin : {
-                                        goods_id: '',
+                                    qty_sp : 1,
+                                    rmb_snap : '',
+                                    sp : {
+                                        gid: '',
                                         barcode: barcode,
-                                        rmb_shangpin: 0,
-                                        title: resp.data.found[0].title,
-                                        rmb_ref: resp.data.found[0].rmb_shoujia,
-                                        thumb: resp.data.found[0].url_photo,
+                                        rmb_sp: 0,
+                                        title: resp.data.found[0].title || '',
+                                        rmb_ref: resp.data.found[0].rmb_shoujia || 0,
+                                        thumb: resp.data.found[0].url_photo || '',
                                     }
                                 }
                             }
                             //接口未查询到商品
-                            else {
+                            else if(resp.data.qty == 0 ){                       // done
                                 this.line = {
-                                    qty_shangpin : 1,
-                                    shangpin : {
-                                        goods_id: '',
+                                    qty_sp : 1,
+                                    sp : {
+                                        gid: '',
                                         barcode: barcode,
-                                        rmb_shangpin: 0,
+                                        rmb_sp: '',
                                         title: '',
                                         rmb_ref: 0,
                                         thumb: '',  //todo 默认图片
                                     }
                                 }
+                            }
+                            else{
+                                //todo
+                                alert('该条码对应多个商品')
                             }
 
                             this.changeShow('price');
@@ -332,12 +356,12 @@
 
             // 清除价格
             clearPrice() {
-                this.line.shangpin.rmb_shangpin = '';
+                this.line.sp.rmb_sp = '';
             },
 
             // 将价格设置为参考价
             setRefPrice() {
-                this.line.shangpin.rmb_shangpin = this.line.shangpin.rmb_ref;
+                this.line.sp.rmb_sp = this.line.sp.rmb_ref;
                 this.changeFocus('input_price');
             },
 
@@ -348,7 +372,7 @@
                 var reg2 = /^\d+$/;   //判断 不加小数点的
                 var reg3 = /^00.*$/;   //判断 以00开头
                 var reg4 = /^0.00$/;    //判断 输入数字为0.00
-                var str = this.line.shangpin.rmb_shangpin + value.toString();
+                var str = this.line.sp.rmb_sp + value.toString();
                 var a = reg.test(str)
                 var b = reg2.test(str)
                 var c = reg3.test(str)
@@ -356,12 +380,12 @@
                 if (!((a || b) && !c && !d))
                     return;
 
-                if (this.line.shangpin.rmb_shangpin.length == 7)
+                if (this.line.sp.rmb_sp.length == 7)
                     return;
 
 
                 if (this.input_focus == 'input_price') {
-                    this.line.shangpin.rmb_shangpin += value.toString();
+                    this.line.sp.rmb_sp += value.toString();
                 }
             },
 
@@ -369,8 +393,8 @@
             onDelete() {
                 console.log(this.input_focus);
                 if (this.input_focus == 'input_price') {
-                    var length = this.line.shangpin.rmb_shangpin.toString().length;
-                    this.line.shangpin.rmb_shangpin = this.line.shangpin.rmb_shangpin.toString().substring(0, length - 1);
+                    var length = this.line.sp.rmb_sp.toString().length;
+                    this.line.sp.rmb_sp = this.line.sp.rmb_sp.toString().substring(0, length - 1);
                 }
             },
 
@@ -387,55 +411,16 @@
                 }
 
                 // 将state的数据修改并提交到后台    添加商品或修改价格
-                this.$store.commit('');
-                
+                this.$store.commit('sps_modify',this.line.sp);
+                this.$store.commit('cart_modify',this.line);
 
-
-
-
-
-                // 将this.goods 中的属性填充好
-                this.fillGoodsModel();
-
-                gl.modifyGoods(that.goods);
-
-                //modify = add的情况下，update_amount = 0 只代表update的数量为0
-                //新的cart的add_amount = 1
-                gl.modifyCart(that.goods,0);
-
-                this.cart = gl.keyed_carts[that.goods.goods_id] ;
-
-                //若商品信息修改了，向后台调用商品修改接口
-                goods_modify({
-                    "shop_id": gl.shop_id,
-                    "cashier_id": gl.cashier_id,
-                    "goods": this.goods,
-                    // "timestamp" : '' //todo 发送时间戳
-                }).then(resp => {
-
-                    console.log('return data', resp);
-
-                    //修改失败
-                    if (resp.data.code == 300) {
-                        Toast(resp.data.msg);
-                        this.show = true;   // 显示键盘
-                    }
-                    // 修改成功
-                    else {
-                        //todo 通过mqtt发送价格变更，直到收到成功消息
-
-                    }
-                }).catch(error => {
-                    console.log(error);
-                });
-
-                this.changeShow('index');
+                // this.changeShow('index');
 
             },
             // 检验计算器中价格是否合法可提交,检验输入时可能不完全但是合法，提交不合法的情况
             checkPrice(){
                 //todo   0.  .    0.0 0.00    0
-                if (this.line.shangpin.rmb_shangpin == '') {
+                if (this.line.sp.rmb_sp == '') {
                     return '请输入售价';
                 }
                 else

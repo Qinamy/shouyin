@@ -111,9 +111,9 @@
                 'count',
                 'cashier_id',
                 'shop_id',
-                'shangpins',
-                'shangpins_indexed',
-                'shangpins_grouped',
+                'sps',
+                'sps_indexed',
+                'sps_grouped',
             ]),
         },
 
@@ -135,16 +135,16 @@
             this.api.goods_sync(this.shop_id,this.cashier_id).then(res=>{
 
                 console.log('res',res);
-                this.$store.commit('shangpins_init',res.data.result);
-                this.$store.commit('shangpins_indexed_init');
-                this.$store.commit('shangpins_grouped_init');
-                this.$store.commit('shangpins_modify');
+                this.$store.commit('sps_init',res.data.result);
+                this.$store.commit('sps_indexed_init');
+                this.$store.commit('sps_grouped_init');
+                // this.$store.commit('sps_modify');
 
-                console.log('shangpins',this.shangpins);
-                console.log('shangpins_indexed',this.shangpins_indexed);
-                console.log('shangpins_grouped',this.shangpins_grouped);
+                console.log('sps',this.sps);
+                console.log('sps_indexed',this.sps_indexed);
+                console.log('sps_grouped',this.sps_grouped);
 
-                // this.sp = { ... this.shangpins[0] };   // 仅限ES6 深拷贝
+                // this.sp = { ... this.sps[0] };   // 仅限ES6 深拷贝
                 // console.log('sp',sp);    // console输出的是变量最后的值
                 // sp.price = 1111;
 
