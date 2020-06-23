@@ -30,7 +30,7 @@
                     <van-cell-group>
                         <van-cell @click="changeFocus('input_price')" style="font-size: 50px;line-height: 60px;">
                             <div style="display: inline-block;color: red;">
-                                ￥{{line.sp.rmb_sp}}
+                                ￥{{sp.rmb_sp}}
                             </div>
 
                             <cursor_icon v-if="input_focus=='input_price'" style="display: inline-block;"></cursor_icon>
@@ -109,6 +109,7 @@
     import { mapState } from 'vuex'
     import {_} from 'vue-underscore';
     import cursor_icon from './cursor_icon'
+    import { Toast } from 'vant'
 
     export default {
         name: 'Scan',
@@ -150,6 +151,14 @@
                         thumb : '',
                     },
                 },
+                sp : {
+                    gid : '',
+                    barcode : '',
+                    rmb_price : '',
+                    title : '',
+                    rmb_ref : 0,
+                    thumb : '',
+                },
             }
         },
 
@@ -162,7 +171,7 @@
                 'sps',
                 'sps_indexed',
                 'sps_grouped',
-                'cart_present',
+                'cart_disp',
                 'carts',
             ]),
         },
@@ -268,22 +277,31 @@
                 console.log(barcode);
                 if(this.scan_mode == 'barcode') {
                     //本地有该货号的商品
-                    if (this.sps_grouped[barcode] != undefined) {
+                     if (this.sps_grouped[barcode] != undefined) {
 
                         console.log('show index')
                         if (this.sps_grouped[barcode].length == 1) {
-                            console.log('haha');
-
                             var sp = this.sps_grouped[barcode][0];
-                            // 将商品深拷贝，并显示到index中
-                            this.line = {
-                                qty_sp : 1,
-                                rmb_snap : sp.rmb_sp,
-                                sp : { ... sp[0] },
+                            this.sp = { ...sp };
+
+                            // todo  有返回值的要放到getter中
+                            var line_found = this.$store.commit('line_find',this.sp.gid);
+                            console.log('line found',line_found);
+                            if( line_found != undefined ){
+                                this.$store.commit('line_qty_modify',line_found);
+                                this.line = line_found;
+                            }
+                            else{
+                                this.line = {
+                                    qty_sp : 1,
+                                    rmb_snap : sp.rmb_sp,
+                                    sp : sp,
+                                }
+                                this.$store.commit('line_push',this.line);
                             }
 
-                            console.log('line',this.line);
 
+                            console.log('line',this.line);
                         } else {
                             // 显示所有相同条码商品，不自动添加数量
                             alert('该条码商品有多个商品，待实现');
@@ -302,31 +320,34 @@
 
                             //接口成功返回商品数据
                             if (resp.data.qty == 1) {
-                                this.line = {
-                                    qty_sp : 1,
-                                    rmb_snap : '',
-                                    sp : {
-                                        gid: '',
+                                this.sp = {
+                                    gid: '',
                                         barcode: barcode,
-                                        rmb_sp: 0,
+                                        rmb_sp: '',
                                         title: resp.data.found[0].title || '',
                                         rmb_ref: resp.data.found[0].rmb_shoujia || 0,
                                         thumb: resp.data.found[0].url_photo || '',
-                                    }
+                                };
+                                this.line = {
+                                    qty_sp : 1,
+                                    rmb_snap : '',
+                                    sp : { ...this.sp }
                                 }
                             }
                             //接口未查询到商品
                             else if(resp.data.qty == 0 ){                       // done
+                                this.sp = {
+                                    gid: '',
+                                    barcode: barcode,
+                                    rmb_sp: '',
+                                    title: '',
+                                    rmb_ref: 0,
+                                    thumb: '',  //todo 默认图片
+                                };
                                 this.line = {
                                     qty_sp : 1,
-                                    sp : {
-                                        gid: '',
-                                        barcode: barcode,
-                                        rmb_sp: '',
-                                        title: '',
-                                        rmb_ref: 0,
-                                        thumb: '',  //todo 默认图片
-                                    }
+                                    rmb_snap : '',
+                                    sp : { ...this.sp }
                                 }
                             }
                             else{
@@ -372,7 +393,7 @@
                 var reg2 = /^\d+$/;   //判断 不加小数点的
                 var reg3 = /^00.*$/;   //判断 以00开头
                 var reg4 = /^0.00$/;    //判断 输入数字为0.00
-                var str = this.line.sp.rmb_sp + value.toString();
+                var str = this.sp.rmb_sp + value.toString();
                 var a = reg.test(str)
                 var b = reg2.test(str)
                 var c = reg3.test(str)
@@ -380,12 +401,12 @@
                 if (!((a || b) && !c && !d))
                     return;
 
-                if (this.line.sp.rmb_sp.length == 7)
+                if (this.sp.rmb_sp.length == 7)
                     return;
 
 
                 if (this.input_focus == 'input_price') {
-                    this.line.sp.rmb_sp += value.toString();
+                    this.sp.rmb_sp += value.toString();
                 }
             },
 
@@ -393,15 +414,13 @@
             onDelete() {
                 console.log(this.input_focus);
                 if (this.input_focus == 'input_price') {
-                    var length = this.line.sp.rmb_sp.toString().length;
-                    this.line.sp.rmb_sp = this.line.sp.rmb_sp.toString().substring(0, length - 1);
+                    var length = this.sp.rmb_sp.toString().length;
+                    this.sp.rmb_sp = this.sp.rmb_sp.toString().substring(0, length - 1);
                 }
             },
 
             // 数字键盘完成按钮事件
             onClose() {  // 点击完成按钮触发事件
-
-                let that = this;
 
                 //检查数字键盘输入是否合法
                 var msg = this.checkPrice();
@@ -410,17 +429,20 @@
                     return ;
                 }
 
-                // 将state的数据修改并提交到后台    添加商品或修改价格
-                this.$store.commit('sps_modify',this.line.sp);
+                // todo 将该部分放到action中，先同步提交到后台，成功后同步到前台
+                this.$store.commit('sps_modify',this.sp);
+                if(this.line.sp.gid == '')
+                    this.line.sp.gid = this.sp.gid;
+                this.line.rmb_snap = this.sp.rmb_sp;
+                this.line.sp.rmb_sp = this.sp.rmb_sp;
                 this.$store.commit('cart_modify',this.line);
 
-                // this.changeShow('index');
-
+                this.changeShow('index');
             },
             // 检验计算器中价格是否合法可提交,检验输入时可能不完全但是合法，提交不合法的情况
             checkPrice(){
                 //todo   0.  .    0.0 0.00    0
-                if (this.line.sp.rmb_sp == '') {
+                if (this.sp.rmb_sp == '') {
                     return '请输入售价';
                 }
                 else

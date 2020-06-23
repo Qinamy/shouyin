@@ -21,7 +21,7 @@ const store = new Vuex.Store({
     carts : [
         // cart,
     ],
-    cart_present : {
+    cart_disp : {
       lines : [
         // {
         //   rmb_snap : 0, // 商品加入时的快照
@@ -115,25 +115,46 @@ const store = new Vuex.Store({
       }
     },
 
+    // 有返回值的要放到getter中
+    line_find (state,gid) {
+      console.log('gid',gid);
+      var line_found = _.find(state.cart_disp.lines,function(line_disp){
+        console.log('line disp gid',line_disp.sp.gid);
+        return line_disp.sp.gid == gid;
+      });
+
+      console.log('state line found',line_found);
+      return line_found;
+    },
+    line_push (state,line) {
+      state.cart_disp.lines.push(line);
+    },
+    // line_ref是state.cart_disp.lines中对象的引用line_found
+    line_qty_modify (state,line_ref) {
+      console('line_qty_modify');
+      line_ref.qty_sp ++ ;
+    },
+
     // 修改购物车
     cart_modify (state,line) {
 
       // 当前购物车中的价格额修改，之前保留的购物车价格不变
 
       // 当前购物车有该gid商品
-      var line_present = _.find(state.cart_present.lines,function(line_present){
-        return line_present.sp.gid == line.sp.gid;
-      });
-      var line_copy = { ...line };
-      console.log('line_present',line_present);
-      console.log('line_copy',line_copy);
+      var line_disp = this.commit('line_find',line.sp.gid);
+      // var line_copy = { ...line };
+      console.log('line_disp',line_disp);
+      // console.log('line_copy',line_copy);
 
-      if(line_present== undefined){
-        state.cart_present.lines.push(line_copy);
+      if(line_disp== undefined){
+        // line.rmb_snap = line.sp.rmb_sp;
+        // state.cart_disp.lines.push(line);
+        this.commit('line_push',line);
       }
-      else{
-        Object.assign(line_present,line_copy);
-      }
+      // else 不用了，因为line是cart_disp中lines中对象的引用
+      // else{
+      //   Object.assign(line_disp,line_copy);
+      // }
 
     }
   },

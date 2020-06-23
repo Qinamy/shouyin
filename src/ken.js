@@ -35,9 +35,12 @@ ken.deepCompare = function (x, y) {
             return false;
         }
 
-        if (x.isPrototypeOf(y) || y.isPrototypeOf(x)) {
+        if(Object.prototype.isPrototypeOf.call(x, y) || Object.prototype.isPrototypeOf.call(y, x)){
             return false;
         }
+        // if (x.isPrototypeOf(y) || y.isPrototypeOf(x)) {
+        //     return false;
+        // }
 
         if (x.constructor !== y.constructor) {
             return false;
@@ -55,7 +58,8 @@ ken.deepCompare = function (x, y) {
         // Quick checking of one object being a subset of another.
         // todo: cache the structure of arguments[0] for performance
         for (p in y) {
-            if (y.hasOwnProperty(p) !== x.hasOwnProperty(p)) {
+            if(Object.prototype.hasOwnProperty.call(y, 'p') !== Object.prototype.hasOwnProperty.call(x, 'p')){
+            // if (y.hasOwnProperty(p) !== x.hasOwnProperty(p)) {
                 return false;
             } else if (typeof y[p] !== typeof x[p]) {
                 return false;
@@ -63,7 +67,8 @@ ken.deepCompare = function (x, y) {
         }
 
         for (p in x) {
-            if (y.hasOwnProperty(p) !== x.hasOwnProperty(p)) {
+            if(Object.prototype.hasOwnProperty.call(y, 'p') !== Object.prototype.hasOwnProperty.call(x, 'p')){
+            // if (y.hasOwnProperty(p) !== x.hasOwnProperty(p)) {
                 return false;
             } else if (typeof y[p] !== typeof x[p]) {
                 return false;
